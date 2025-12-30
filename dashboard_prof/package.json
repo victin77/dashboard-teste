@@ -1,10 +1,12 @@
 {
-  "name": "dashboard-comissoes-prof",
-  "private": true,
-  "workspaces": ["client", "server"],
+  "name": "dashboard-comissoes",
+  "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "npm --workspace server run dev",
-    "build": "npm --workspace client run build && npm --workspace server run build",
-    "start": "npm --workspace server start"
+    "build": "cd frontend && npm install && npm run build && rm -rf ../public && mv dist ../public",
+    "start": "node backend/server.js"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
