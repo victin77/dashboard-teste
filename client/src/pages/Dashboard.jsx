@@ -244,6 +244,8 @@ export default function Dashboard({ user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState([]);
   const [consultants, setConsultants] = useState([]);
+  const [summary, setSummary] = useState(null);
+
   const [saleFormOpen, setSaleFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [details, setDetails] = useState(null);
@@ -256,12 +258,16 @@ export default function Dashboard({ user, onLogout }) {
   const load = async () => {
     setLoading(true);
     try {
-      const [c, s] = await Promise.all([
-        api.listConsultants(),
-        api.listSales()
-      ]);
-      setConsultants(c);
-      setSales(s);
+const [c, s, sum] = await Promise.all([
+  api.listConsultants(),
+  api.listSales(),
+  fetch('/api/summary', { credentials: 'include' }).then(r => r.ok ? r.json() : null)
+]);
+
+setConsultants(c);
+setSales(s);
+setSummary(sum);
+
     } finally {
       setLoading(false);
     }
