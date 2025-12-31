@@ -14,7 +14,6 @@ import sqlite3 from 'sqlite3';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
 function getDbFile() {
   // Render: mount a persistent disk at /data to keep the SQLite file between deploys.
   const preferredDir = process.env.DB_DIR || (fs.existsSync('/data') ? '/data' : __dirname);
@@ -324,7 +323,10 @@ app.get('/api/sales', auth(), async (req, res) => {
 
   const saleIds = rows.map(r => r.id);
   const installments = saleIds.length
-    ? await db.all(`SELECT * FROM installments WHERE sale_id IN (${saleIds.map(() => '?').join(',')}) ORDER BY sale_id, number`, saleIds)
+    ? await db.all(
+        `SELECT * FROM installments WHERE sale_id IN (${saleIds.map(() => '?').join(',')}) ORDER BY sale_id, number`,
+        saleIds
+      )
     : [];
 
   const bySale = new Map();
@@ -466,11 +468,6 @@ app.put('/api/sales/:id/installments', auth(), async (req, res) => {
   res.json({ ok: true, installments: its });
 });
 
-// ---- Serve client
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
-app.use(express.static(clientDist));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(clientDist, 'index
 // =========================
 // Summary (KPIs rápidos)
 // =========================
@@ -636,8 +633,11 @@ app.get('/api/export/xlsx', auth(), async (req, res) => {
   res.end();
 });
 
-
-.html'));
+// ---- Serve client (SEMPRE POR ÚLTIMO)
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+app.use(express.static(clientDist));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientDist, 'index.html'));
 });
 
 await initDb();
