@@ -14,8 +14,10 @@ import {
   Settings2,
   KeyRound,
   Trash2,
-  Pencil
+  Pencil,
+  Download 
 } from 'lucide-react';
+
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
