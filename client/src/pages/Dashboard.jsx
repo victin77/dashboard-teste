@@ -15,9 +15,8 @@ import {
   KeyRound,
   Trash2,
   Pencil,
-  Download 
+  Download
 } from 'lucide-react';
-
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -53,8 +52,7 @@ function Pill({ icon: Icon, label, value, tone='violet' }) {
     rose: 'from-rose-600 to-pink-600 shadow-rose-600/25'
   };
   return (
-    <div className={`rounded-3xl p-5 bg-gradient-to-r ${map[tone]} shadow-xl`}
-    >
+    <div className={`rounded-3xl p-5 bg-gradient-to-r ${map[tone]} shadow-xl`}>
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs uppercase tracking-wide text-white/70">{label}</div>
@@ -238,6 +236,30 @@ function SaleForm({ open, onClose, onSave, consultants, user, editing }) {
   );
 }
 
+/* =========================
+   HELPERS PARCELAS
+========================= */
+
+function isOverdue(due_date) {
+  if (!due_date) return false;
+  // comparando yyyy-mm-dd (string) funciona bem
+  return String(due_date) < todayIso();
+}
+
+function normalizeInstallmentForUi(it) {
+  // status "overdue" automático no front se estiver pendente e vencido
+  const paid = it.status === 'paid' || !!it.paid_date;
+  const overdueAuto = !paid && isOverdue(it.due_date);
+  const status = paid ? 'paid' : (overdueAuto ? 'overdue' : 'pending');
+  return {
+    number: Number(it.number),
+    value: Number(it.value || 0),
+    due_date: String(it.due_date),
+    status,
+    paid_date: it.paid_date ? String(it.paid_date) : null
+  };
+}
+
 export default function Dashboard({ user, onLogout }) {
   const [darkMode, setDarkMode] = useState(true);
   const [tab, setTab] = useState('overview');
@@ -249,6 +271,12 @@ export default function Dashboard({ user, onLogout }) {
   const [saleFormOpen, setSaleFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [details, setDetails] = useState(null);
+
+  // edição de parcelas
+  const [editingInstallments, setEditingInstallments] = useState([]);
+  const [savingInstallments, setSavingInstallments] = useState(false);
+  const [installmentsMsg, setInstallmentsMsg] = useState('');
+
   const isAdmin = user.role === 'admin';
 
   useEffect(() => {
@@ -258,16 +286,14 @@ export default function Dashboard({ user, onLogout }) {
   const load = async () => {
     setLoading(true);
     try {
-const [c, s, sum] = await Promise.all([
-  api.listConsultants(),
-  api.listSales(),
-  fetch('/api/summary', { credentials: 'include' }).then(r => r.ok ? r.json() : null)
-]);
-
-setConsultants(c);
-setSales(s);
-setSummary(sum);
-
+      const [c, s, sum] = await Promise.all([
+        api.listConsultants(),
+        api.listSales(),
+        fetch('/api/summary', { credentials: 'include' }).then(r => r.ok ? r.json() : null)
+      ]);
+      setConsultants(c);
+      setSales(s);
+      setSummary(sum);
     } finally {
       setLoading(false);
     }
@@ -275,17 +301,32 @@ setSummary(sum);
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    // toda vez que abrir detalhes, prepara parcelas editáveis
+    if (!details) {
+      setEditingInstallments([]);
+      setInstallmentsMsg('');
+      return;
+    }
+    const list = (details.installments || []).map(normalizeInstallmentForUi).sort((a,b)=>a.number-b.number);
+    setEditingInstallments(list);
+    setInstallmentsMsg('');
+  }, [details]);
+
   const kpis = useMemo(() => {
     const total = sales.reduce((a, x) => a + Number(x.total_commission || 0), 0);
     let paid = 0, pending = 0, overdue = 0;
+
     for (const s of sales) {
-      for (const it of (s.installments || [])) {
+      for (const it0 of (s.installments || [])) {
+        const it = normalizeInstallmentForUi(it0);
         const v = Number(it.value || 0);
         if (it.status === 'paid') paid += v;
         else if (it.status === 'overdue') overdue += v;
         else pending += v;
       }
     }
+
     const credit = sales.reduce((a, x) => a + Number(x.credit_generated || 0), 0);
     return { total, paid, pending, overdue, credit, count: sales.length };
   }, [sales]);
@@ -350,7 +391,6 @@ setSummary(sum);
     window.URL.revokeObjectURL(url);
   };
 
-
   const saveSale = async (payload) => {
     if (editing) {
       await api.updateSale(editing.id, payload);
@@ -365,6 +405,65 @@ setSummary(sum);
     await api.deleteSale(id);
     setDetails(null);
     await load();
+  };
+
+  const setInstallmentUiStatus = (number, newUiStatus) => {
+    setEditingInstallments(prev => prev.map(it => {
+      if (it.number !== number) return it;
+
+      if (newUiStatus === 'paid') {
+        return { ...it, status: 'paid', paid_date: todayIso() };
+      }
+      // pending: se está vencida, vai aparecer como atrasada automaticamente (normalize)
+      return { ...it, status: 'pending', paid_date: null };
+    }));
+  };
+
+  const saveInstallments = async () => {
+    if (!details) return;
+    setSavingInstallments(true);
+    setInstallmentsMsg('');
+
+    try {
+      // ao salvar: se não está pago e venceu, manda como overdue (pra ficar persistido)
+      const payloadInstallments = editingInstallments.map(it => {
+        const paid = it.status === 'paid' || !!it.paid_date;
+        const overdue = !paid && isOverdue(it.due_date);
+        return {
+          number: it.number,
+          value: it.value,
+          due_date: it.due_date,
+          status: paid ? 'paid' : (overdue ? 'overdue' : 'pending'),
+          paid_date: paid ? (it.paid_date || todayIso()) : null
+        };
+      });
+
+      const resp = await fetch(`/api/sales/${details.id}/installments`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ installments: payloadInstallments })
+      });
+
+      if (!resp.ok) {
+        setInstallmentsMsg('❌ Não foi possível salvar as parcelas. Faça login novamente e tente de novo.');
+        return;
+      }
+
+      // recarrega tudo e reabre detalhes atualizado (por id)
+      await load();
+      setInstallmentsMsg('✅ Parcelas salvas.');
+      // Atualiza o modal com os dados mais recentes
+      setDetails(prev => {
+        if (!prev) return prev;
+        const updated = sales.find(x => x.id === prev.id);
+        return updated || prev;
+      });
+    } catch (e) {
+      setInstallmentsMsg('❌ Erro ao salvar parcelas.');
+    } finally {
+      setSavingInstallments(false);
+    }
   };
 
   return (
@@ -425,8 +524,7 @@ setSummary(sum);
           <div className="text-slate-600 dark:text-slate-300 animate-pulse">Carregando…</div>
         ) : (
           <>
-            
-{tab === 'overview' && (
+            {tab === 'overview' && (
               <div className="space-y-8">
                 {summary && (
                   <div className="space-y-3">
@@ -434,12 +532,12 @@ setSummary(sum);
                       Resumo rápido
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <Pill icon={FileText} label="Vendas hoje" value={`${summary.today.sales_count || 0}`} tone="cyan" />
-                      <Pill icon={BarChart3} label="Comissão hoje" value={fmtBRL(summary.today.commission_total || 0)} tone="emerald" />
-                      <Pill icon={FileText} label="Vendas (7 dias)" value={`${summary.last7.sales_count || 0}`} tone="violet" />
-                      <Pill icon={BarChart3} label="Comissão (mês)" value={fmtBRL(summary.month.commission_total || 0)} tone="violet" />
-                      <Pill icon={BarChart3} label="Parcelas pendentes" value={`${summary.installments.pending || 0}`} tone="amber" />
-                      <Pill icon={BarChart3} label="Parcelas atrasadas" value={`${summary.installments.overdue || 0}`} tone="rose" />
+                      <Pill icon={FileText} label="Vendas hoje" value={`${summary.today?.sales_count || 0}`} tone="cyan" />
+                      <Pill icon={BarChart3} label="Comissão hoje" value={fmtBRL(summary.today?.commission_total || 0)} tone="emerald" />
+                      <Pill icon={FileText} label="Vendas (7 dias)" value={`${summary.last7?.sales_count || 0}`} tone="violet" />
+                      <Pill icon={BarChart3} label="Comissão (mês)" value={fmtBRL(summary.month?.commission_total || 0)} tone="violet" />
+                      <Pill icon={BarChart3} label="Parcelas pendentes" value={`${summary.installments?.pending || 0}`} tone="amber" />
+                      <Pill icon={BarChart3} label="Parcelas atrasadas" value={`${summary.installments?.overdue || 0}`} tone="rose" />
                     </div>
                   </div>
                 )}
@@ -537,18 +635,55 @@ setSummary(sum);
             </div>
 
             <div className="rounded-3xl border border-slate-200/60 dark:border-white/10 overflow-hidden">
-              <div className="px-4 py-3 bg-slate-50 dark:bg-white/5 border-b border-slate-200/60 dark:border-white/10 font-semibold">
-                Parcelas (6)
+              <div className="px-4 py-3 bg-slate-50 dark:bg-white/5 border-b border-slate-200/60 dark:border-white/10 font-semibold flex items-center justify-between">
+                <div>Parcelas (6)</div>
+
+                <button
+                  onClick={saveInstallments}
+                  disabled={savingInstallments}
+                  className="px-4 py-2 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold shadow-lg shadow-violet-600/20 disabled:opacity-60"
+                >
+                  {savingInstallments ? 'Salvando…' : 'Salvar parcelas'}
+                </button>
               </div>
+
+              {installmentsMsg && (
+                <div className="px-4 py-3 text-sm border-b border-slate-200/60 dark:border-white/10 bg-slate-50/60 dark:bg-white/5">
+                  {installmentsMsg}
+                </div>
+              )}
+
               <div className="divide-y divide-slate-200/60 dark:divide-white/10">
-                {(details.installments || []).map((it) => {
+                {(editingInstallments || []).map((it) => {
                   const st = statusLabel(it.status);
+                  const isPaid = it.status === 'paid';
+                  const isAutoOverdue = it.status === 'overdue' && !it.paid_date;
+
                   return (
                     <div key={it.number} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                       <div className="text-sm font-medium">Parcela {it.number}</div>
                       <div className="text-sm">Venc.: {fmtDate(it.due_date)}</div>
                       <div className="text-sm font-semibold">{fmtBRL(it.value)}</div>
-                      <span className={`text-xs px-3 py-1 rounded-full border ${st.cls}`}>{st.text}</span>
+
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-3 py-1 rounded-full border ${st.cls}`}>{st.text}</span>
+
+                        <select
+                          value={isPaid ? 'paid' : 'pending'}
+                          onChange={(e) => setInstallmentUiStatus(it.number, e.target.value)}
+                          className="rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+                          title={isAutoOverdue ? 'Está atrasada automaticamente (vencida e não paga).' : 'Alterar status'}
+                        >
+                          <option value="pending">Pendente</option>
+                          <option value="paid">Paga</option>
+                        </select>
+
+                        {isPaid && (
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            Pago em: {fmtDate(it.paid_date || todayIso())}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
