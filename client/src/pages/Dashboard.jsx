@@ -33,24 +33,17 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Le
 function Shell({ darkMode, children }) {
   return (
     <div
-      className={`min-h-screen w-full transition-colors duration-700 ${
-        darkMode
-          ? 'bg-[radial-gradient(circle_at_top,_#1e293b,_#020617)] text-slate-100'
-          : 'bg-[radial-gradient(circle_at_top,_#0f172a,_#020617)] text-slate-100'
-      }`}
+      className={`min-h-screen transition-all duration-500
+        ${
+          darkMode
+            ? "bg-slate-950 text-slate-100"
+            : "bg-slate-50 text-slate-900"
+        }`}
     >
-      {/* glows de fundo */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -left-32 w-96 h-96 rounded-full bg-sky-500/25 blur-3xl" />
-        <div className="absolute -top-10 right-0 w-[28rem] h-[28rem] rounded-full bg-indigo-500/30 blur-3xl" />
-        <div className="absolute bottom-[-6rem] left-1/3 w-80 h-80 rounded-full bg-cyan-500/20 blur-3xl" />
-      </div>
+      {/* fundo suave com grid sutil (profissional, não exagerado) */}
+      <div className="fixed inset-0 pointer-events-none -z-10 opacity-[0.08] bg-[linear-gradient(to_right,#64748b_1px,transparent_1px),linear-gradient(to_bottom,#64748b_1px,transparent_1px)] bg-[size:70px_70px]" />
 
-      {/* textura em grid bem suave */}
-      <div className="fixed inset-0 -z-10 opacity-[0.08] pointer-events-none bg-[linear-gradient(to_right,_#1e293b_1px,_transparent_1px),linear-gradient(to_bottom,_#1e293b_1px,_transparent_1px)] bg-[size:80px_80px]" />
-
-      {/* conteúdo principal */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </div>
     </div>
