@@ -39,10 +39,6 @@ function Shell({ darkMode, children }) {
             ? "bg-slate-950 text-slate-100"
             : "bg-slate-50 text-slate-900"
         }`}
-    >
-      {/* fundo suave com grid sutil (profissional, não exagerado) */}
-      <div className="fixed inset-0 pointer-events-none -z-10 opacity-[0.08] bg-[linear-gradient(to_right,#64748b_1px,transparent_1px),linear-gradient(to_bottom,#64748b_1px,transparent_1px)] bg-[size:70px_70px]" />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </div>
