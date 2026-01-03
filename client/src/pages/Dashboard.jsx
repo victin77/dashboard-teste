@@ -32,16 +32,31 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Le
 
 function Shell({ darkMode, children }) {
   return (
-    <div className={`min-h-screen transition-all duration-500 ${darkMode ? 'dark bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white' : 'bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900'}`}>
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-violet-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob" />
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000" />
+    <div
+      className={`min-h-screen w-full transition-colors duration-700 ${
+        darkMode
+          ? 'bg-[radial-gradient(circle_at_top,_#1e293b,_#020617)] text-slate-100'
+          : 'bg-[radial-gradient(circle_at_top,_#0f172a,_#020617)] text-slate-100'
+      }`}
+    >
+      {/* glows de fundo */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -left-32 w-96 h-96 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="absolute -top-10 right-0 w-[28rem] h-[28rem] rounded-full bg-indigo-500/30 blur-3xl" />
+        <div className="absolute bottom-[-6rem] left-1/3 w-80 h-80 rounded-full bg-cyan-500/20 blur-3xl" />
       </div>
-      {children}
+
+      {/* textura em grid bem suave */}
+      <div className="fixed inset-0 -z-10 opacity-[0.08] pointer-events-none bg-[linear-gradient(to_right,_#1e293b_1px,_transparent_1px),linear-gradient(to_bottom,_#1e293b_1px,_transparent_1px)] bg-[size:80px_80px]" />
+
+      {/* conteúdo principal */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {children}
+      </div>
     </div>
   );
 }
+
 
 function Pill({ icon: Icon, label, value, tone='violet' }) {
   const map = {
